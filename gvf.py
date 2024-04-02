@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 from scipy.interpolate import CubicSpline
 
 class ParametricPath:
@@ -10,53 +9,39 @@ class ParametricPath:
     def __call__(self, t):
         return self.path_function(t)
 
-def generate_gvf(path_function, kN):
-    fig, ax = plt.subplots()
-    
-    # Plot path
-    t_values = np.linspace(0, 2 * np.pi, 100)
+def generate_gvf(path_function, kN, num_points=100):
+    # parametric points
+    t_values = np.linspace(0, 2 * np.pi, num_points)
     path_points = np.array([path_function(t) for t in t_values])
-    ax.plot(path_points[:, 0], path_points[:, 1], 'g-', label='Path')
+    
+    # tangent vectors
+    tangents = []
+    for t in t_values:
+        tangent = path_function(t + 0.01) - path_function(t - 0.01)
+        tangents.append(tangent / np.linalg.norm(tangent))
 
-    # Plot tangent vectors and guiding vector field
-    for t in np.linspace(0, 2 * np.pi, num=50):
-        point = path_function(t)
-        tangent = path_function(t + 0.01) - point  # Approximate tangent
-        tangent /= np.linalg.norm(tangent)
-        
-        # Ideal direction vector
-        ideal_direction = path_function(t + 0.01) - path_function(t - 0.01)
-        ideal_direction /= np.linalg.norm(ideal_direction)
-        
-        # Calculate error as cosine of the angle between tangent and ideal direction
-        error = np.dot(tangent, ideal_direction)
-        
-        # Calculate guiding vector
-        gvf = tangent + kN * error * ideal_direction
-        
-        # Scale vectors to have fixed length
-        scale_factor = 0.5  # Choose a scale factor for the vector length
-        gvf_scaled = gvf * scale_factor
-        
-        ax.arrow(point[0], point[1], gvf_scaled[0], gvf_scaled[1], head_width=0.05, head_length=0.1, color='blue', alpha=0.5)
+    # ideal direction
+    ideal_directions = np.roll(path_points, -1, axis=0) - np.roll(path_points, 1, axis=0)
+    ideal_directions /= np.linalg.norm(ideal_directions, axis=1)[:, np.newaxis]
 
-    ax.set_aspect('equal', adjustable='box')
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_title('Guiding Vector Field')
-    ax.legend()
-    plt.show()
+    # error function
+    errors = np.sum(tangents * ideal_directions, axis=1)
 
-def circle_path(t):
-    radius = 1.0
-    x = radius * np.cos(t)
-    y = radius * np.sin(t)
-    return np.array([x, y])
+    # gvf calculation (see paper)
+    gvfs = tangents + kN * errors[:, np.newaxis] * ideal_directions
 
-# Define the points that the robot will pass through
-points = np.array([[0, 0], [1, 2], [3, 4], [5, 1], [0, 0]])  # Adding the first point as the last point to close the loop
+    # vector visualization
+    scale_factor = 0.5
+    gvfs_scaled = gvfs * scale_factor
 
-# Perform cubic spline interpolation to generate a smooth path
+    return path_points, gvfs_scaled
+
+def normalize_vector_field(vx, vy):
+    magnitude = np.sqrt(vx**2 + vy**2)
+    return vx / magnitude, vy / magnitude
+
+points = np.array([[0, 0], [1, 2], [3, 4], [5, 1], [0, 0]])
+
 t_values = np.linspace(0, 1, len(points))
 spline_x = CubicSpline(t_values, points[:, 0], bc_type='periodic')  
 spline_y = CubicSpline(t_values, points[:, 1], bc_type='periodic')
@@ -66,5 +51,16 @@ def spline_path(t):
 
 parametric_path_spline = ParametricPath(spline_path)
 
-kN = 0
-generate_gvf(parametric_path_spline, kN)
+kN = 0.5
+path_points, gvfs_scaled = generate_gvf(parametric_path_spline, kN)
+
+plt.figure(figsize=(8, 6))
+plt.plot(path_points[:, 0], path_points[:, 1], 'g-', label='Path')
+plt.quiver(path_points[:, 0], path_points[:, 1], gvfs_scaled[:, 0], gvfs_scaled[:, 1], scale=20)
+plt.xlabel('X')
+plt.ylabel('Y')
+plt.title('Guiding Vector Field with Convergence to Parametric Path')
+plt.legend()
+plt.grid(True)
+plt.gca().set_aspect('equal', adjustable='box')
+plt.show()
