@@ -36,10 +36,6 @@ def generate_gvf(path_function, kN, num_points=100):
 
     return path_points, gvfs_scaled
 
-def normalize_vector_field(vx, vy):
-    magnitude = np.sqrt(vx**2 + vy**2)
-    return vx / magnitude, vy / magnitude
-
 points = np.array([[0, 0], [1, 2], [3, 4], [5, 1], [0, 0]])
 
 t_values = np.linspace(0, 1, len(points))
