@@ -78,6 +78,9 @@ class PathEditor:
         path_points = np.array([parametric_path(t) for t in t_values])
         plt.plot(path_points[:, 0], path_points[:, 1], 'g-', label='Path')
 
+        for i in range(len(gvfpath_points)):
+            plt.arrow(gvfpath_points[i, 0], gvfpath_points[i, 1], gvfs[i, 0], gvfs[i, 1], color='pink', head_width=10, head_length=20)
+
         plt.scatter(points_array[:, 0], points_array[:, 1], color='red', label='Waypoints')
         plt.quiver(gvfpath_points[:, 0], gvfpath_points[:, 1], gvfs[:, 0], gvfs[:, 1])
         plt.xlabel('X')
