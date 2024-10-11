@@ -1,4 +1,6 @@
-use nannou::prelude::*;
+use nannou::{
+    geom::Path, prelude::*
+};
 use std::f32::consts::PI;
 
 struct RobotState {
@@ -24,7 +26,8 @@ struct Model {
     robot: RobotState,
     params: SimulationParams,
     goal: Point2,
-    path: Vec<Point2>,
+    path: Path,   
+    followed_path: Vec<Point2>,
     reached_goal: bool,
 }
 
@@ -57,13 +60,20 @@ fn model(app: &App) -> Model {
 
     let goal = pt2(3.0, 3.0);
 
-    let path = Vec::new();
+    let builder = Path::builder()
+        .begin(pt2(-2.0, -2.0))
+        .cubic_bezier_to(pt2(-1.0, -1.0), pt2(1.0, 1.0), goal)
+        .close();
+    let path = builder.build();
+
+    let followed_path = Vec::new();
 
     Model {
         robot,
         params,
         goal,
         path,
+        followed_path,
         reached_goal: false,
     }
 }
@@ -145,7 +155,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
     model.robot.theta += omega * dt;
 
     // update robot path
-    model.path.push(pt2(model.robot.x, model.robot.y));
+    model.followed_path.push(pt2(model.robot.x, model.robot.y));
 
     if model.distance_to_goal() < model.params.stop_threshold {
         model.reached_goal = true;
@@ -222,9 +232,9 @@ fn view(app: &App, model: &Model, frame: Frame) {
         .color(rgba(0.0, 1.0, 0.0, 0.3));
 
     // robot path (updates)
-    if model.path.len() >= 2 {
+    if model.followed_path.len() >= 2 {
         draw.polyline()
-            .points(model.path.iter().map(|p| *p * scaling))
+            .points(model.followed_path.iter().map(|p| *p * scaling))
             .color(BLUE);
     }
 
