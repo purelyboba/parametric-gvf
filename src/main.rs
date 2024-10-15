@@ -8,15 +8,12 @@ struct RobotState {
 }
 
 struct SimulationParams {
-    // control params
     v_max: f32,
     k_p: f32,
-    // movement params
     decel_radius: f32,
     goal_threshold: f32,
     stop_threshold: f32,
     min_velocity: f32,
-    decel_power: f32,
 }
 
 struct Model {
@@ -27,6 +24,7 @@ struct Model {
     path_control_points: [Point2; 4],
     followed_path: Vec<Point2>,
     reached_goal: bool,
+    simulation_time: f32,
 }
 
 fn main() {
@@ -39,13 +37,12 @@ fn model(app: &App) -> Model {
     app.new_window().size(800, 800).view(view).build().unwrap();
     
     let params = SimulationParams {
-        v_max: 1.0,
-        k_p: 2.0,
-        decel_radius: 2.0,
-        goal_threshold: 0.2,
-        stop_threshold: 0.05,
-        min_velocity: 0.3,
-        decel_power: 0.7,
+        v_max: 2.0,
+        k_p: 6.0,
+        decel_radius: 1.0,
+        goal_threshold: 0.1,
+        stop_threshold: 0.01,
+        min_velocity: 0.1,
     };
 
     let robot = RobotState {
@@ -71,6 +68,7 @@ fn model(app: &App) -> Model {
         reached_goal: false,
         path: Vec::new(),
         path_control_points,
+        simulation_time: 0.0,
     };
 
     model.generate_bezier_path(100);
@@ -135,6 +133,11 @@ impl Model {
         let target = self.calculate_target_point(point);
         let (_, distance) = self.find_closest_point_on_path(point);
         let direction = (target - point).normalize();
+        
+        if !direction.x.is_finite() || !direction.y.is_finite() || !distance.is_finite() {
+            return (0.0, 0.0);
+        }
+        
         (direction.x * distance, direction.y * distance)
     }
 
@@ -146,10 +149,7 @@ impl Model {
         } else if distance < self.params.goal_threshold {
             self.params.min_velocity / self.params.v_max
         } else if distance < self.params.decel_radius {
-            let scale = ((distance - self.params.goal_threshold) /
-                (self.params.decel_radius - self.params.goal_threshold))
-                .powf(self.params.decel_power);
-            scale.max(self.params.min_velocity / self.params.v_max)
+            (distance / self.params.decel_radius).max(self.params.min_velocity / self.params.v_max)
         } else {
             1.0
         }
@@ -160,7 +160,14 @@ impl Model {
             return (0.0, 0.0);
         }
 
-        let (dx, dy) = self.calculate_vector_field(self.robot.x, self.robot.y);
+        let distance_to_goal = self.distance_to_goal();
+        let (dx, dy) = if distance_to_goal <= self.params.decel_radius {
+            // Direct path to goal when within deceleration radius
+            (self.goal.x - self.robot.x, self.goal.y - self.robot.y)
+        } else {
+            self.calculate_vector_field(self.robot.x, self.robot.y)
+        };
+
         let desired_theta = dy.atan2(dx);
         
         let theta_error = (desired_theta - self.robot.theta)
@@ -179,22 +186,30 @@ impl Model {
     }
 }
 
-fn update(_app: &App, model: &mut Model, _update: Update) {
+fn update(_app: &App, model: &mut Model, update: Update) {
     if model.reached_goal {
         return;
     }
 
     let (v, omega) = model.compute_control();
     
-    let dt = 1.0 / 60.0;
+    let dt = update.since_last.as_secs_f32();
     model.robot.x += v * model.robot.theta.cos() * dt;
     model.robot.y += v * model.robot.theta.sin() * dt;
     model.robot.theta += omega * dt;
 
     model.followed_path.push(pt2(model.robot.x, model.robot.y));
 
-    if model.distance_to_goal() < model.params.stop_threshold {
+    model.simulation_time += dt;
+
+    let distance_to_goal = model.distance_to_goal();
+    if distance_to_goal < model.params.stop_threshold {
         model.reached_goal = true;
+        // Snap to exact goal position
+        model.robot.x = model.goal.x;
+        model.robot.y = model.goal.y;
+        model.followed_path.push(model.goal);
+        println!("Goal reached in {:.2} seconds!", model.simulation_time);
     }
 }
 
@@ -215,26 +230,46 @@ fn view(app: &App, model: &Model, frame: Frame) {
             let x = -field_size / 2.0 + i as f32 * step;
             let y = -field_size / 2.0 + j as f32 * step;
             
-            let (dx, dy) = model.calculate_vector_field(x, y);
+            let point = pt2(x, y);
+            let distance_to_goal = (point - model.goal).length();
+            
+            let (dx, dy) = if distance_to_goal <= model.params.decel_radius {
+                // Direct vector to goal when within deceleration radius
+                (model.goal.x - x, model.goal.y - y)
+            } else {
+                model.calculate_vector_field(x, y)
+            };
+            
+            if !dx.is_finite() || !dy.is_finite() {
+                continue;
+            }
+            
             let magnitude = (dx * dx + dy * dy).sqrt();
             
-            let arrow_length = 0.1;
-            let start = pt2(x, y) * scaling;
-            let end = pt2(x + dx * arrow_length, y + dy * arrow_length) * scaling;
+            let arrow_length = 0.2;  // Fixed arrow length
+            let start = point * scaling;
+            let direction = if magnitude > 0.0 {
+                pt2(dx, dy) / magnitude
+            } else {
+                pt2(0.0, 0.0)
+            };
+            let end = (point + direction * arrow_length) * scaling;
 
             let max_magnitude = 1.0;
             let normalized_magnitude = (magnitude / max_magnitude).min(1.0);
-
-            let color = rgb(1.0 * normalized_magnitude, 0.0, 1.0 - normalized_magnitude);
+            let color = rgb(
+                0.5 - normalized_magnitude * 0.5,
+                0.5 - normalized_magnitude * 0.3,
+                1.0 - normalized_magnitude * 0.3
+            );
 
             draw.line()
                 .start(start)
                 .end(end)
-                .stroke_weight(1.0)
+                .stroke_weight(1.5)
                 .color(color);
             
-            // Draw arrowhead
-            let arrow_head_length = 0.1 * scaling;
+            let arrow_head_length = 0.05 * scaling;
             let angle = dy.atan2(dx);
             let head_angle = PI / 6.0;
             
@@ -250,13 +285,13 @@ fn view(app: &App, model: &Model, frame: Frame) {
             draw.line()
                 .start(end)
                 .end(head1)
-                .stroke_weight(1.0)
+                .stroke_weight(1.5)
                 .color(color);
             
             draw.line()
                 .start(end)
                 .end(head2)
-                .stroke_weight(1.0)
+                .stroke_weight(1.5)
                 .color(color);
         }
     }
@@ -303,6 +338,20 @@ fn view(app: &App, model: &Model, frame: Frame) {
         .start(robot_pos)
         .end(heading_end)
         .color(RED);
+
+    // Display simulation time and goal reached status
+    let time_text = format!("Time: {:.2}s", model.simulation_time);
+    draw.text(&time_text)
+        .xy(pt2(-350.0, 350.0))
+        .color(BLACK)
+        .font_size(20);
+
+    if model.reached_goal {
+        draw.text("Goal reached")
+            .xy(pt2(-350.0, 320.0))
+            .color(BLACK)
+            .font_size(20);
+    }
 
     draw.to_frame(app, &frame).unwrap();
 }
