@@ -14,7 +14,6 @@ struct SimulationParams {
     goal_threshold: f32,
     stop_threshold: f32,
     min_velocity: f32,
-    obstacle_influence: f32,
 }
 
 struct Obstacle {
@@ -44,13 +43,12 @@ fn model(app: &App) -> Model {
     app.new_window().size(800, 800).view(view).build().unwrap();
     
     let params = SimulationParams {
-        v_max: 2.0,
+        v_max: 3.0,
         k_p: 20.0,
         decel_radius: 1.0,
         goal_threshold: 0.1,
         stop_threshold: 0.01,
         min_velocity: 0.1,
-        obstacle_influence: 2.0,
     };
 
     let robot = RobotState {
@@ -69,7 +67,7 @@ fn model(app: &App) -> Model {
     let goal = path_control_points[3];
     let obstacle = Obstacle {
         position: pt2(0.0, 0.0),
-        radius: 0.3,
+        radius: 0.2,
     };
 
     let mut model = Model {
@@ -145,20 +143,28 @@ impl Model {
         let point = pt2(x, y);
         let target = self.calculate_target_point(point);
         let (_, distance) = self.find_closest_point_on_path(point);
-        let mut direction = (target - point).normalize();
+        let path_direction = (target - point).normalize();
         
         let obstacle_vector = point - self.obstacle.position;
         let obstacle_distance = obstacle_vector.length();
         
-        let obstacle_influence_radius = self.obstacle.radius * 3.0;
+        let obstacle_influence_radius = self.obstacle.radius * 5.0; // Increased influence radius
+        
+        let mut direction = path_direction;
         
         if obstacle_distance < obstacle_influence_radius {
             let influence_strength = 1.0 - (obstacle_distance / obstacle_influence_radius).powi(2);
-            let obstacle_influence = influence_strength * self.params.obstacle_influence;
+            let obstacle_influence = influence_strength;
             
             let obstacle_direction = obstacle_vector.normalize();
-            direction += obstacle_direction * obstacle_influence;
-            direction = direction.normalize();
+            
+            let perpendicular = vec2(-path_direction.y, path_direction.x);
+            
+            let side = perpendicular.dot(obstacle_vector).signum();
+            
+            let avoidance_vector = (obstacle_direction + side * perpendicular).normalize();
+            
+            direction = (path_direction + avoidance_vector * obstacle_influence).normalize();
         }
         
         if !direction.x.is_finite() || !direction.y.is_finite() || !distance.is_finite() {
