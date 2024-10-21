@@ -30,7 +30,7 @@ struct Model {
     followed_path: Vec<Point2>,
     reached_goal: bool,
     simulation_time: f32,
-    obstacle: Obstacle,
+    obstacles: Vec<Obstacle>,
 }
 
 fn main() {
@@ -65,10 +65,44 @@ fn model(app: &App) -> Model {
     ];
 
     let goal = path_control_points[3];
-    let obstacle = Obstacle {
+
+    let mut obstacles = Vec::new();
+    obstacles.push(Obstacle {
+        position: pt2(-3.0, 3.0),
+        radius: 0.2,
+    });
+    obstacles.push(Obstacle {
+        position: pt2(3.0, -3.0),
+        radius: 0.2,
+    });
+    obstacles.push(Obstacle {
         position: pt2(0.0, 0.0),
         radius: 0.2,
-    };
+    });
+    obstacles.push(Obstacle {
+        position: pt2(0.0, 3.0),
+        radius: 0.2,
+    });     
+    obstacles.push(Obstacle {
+        position: pt2(0.0, -3.0),
+        radius: 0.2,
+    });
+    obstacles.push(Obstacle {
+        position: pt2(3.0, 0.0),
+        radius: 0.2,
+    });
+    obstacles.push(Obstacle {
+        position: pt2(-3.0, 0.0),
+        radius: 0.2,
+    });
+    obstacles.push(Obstacle {
+        position: pt2(-3.0, -3.0),
+        radius: 0.2,
+    });
+    obstacles.push(Obstacle {
+        position: pt2(3.0, 3.0),
+        radius: 0.2,
+    });
 
     let mut model = Model {
         robot,
@@ -79,7 +113,7 @@ fn model(app: &App) -> Model {
         path: Vec::new(),
         path_control_points,
         simulation_time: 0.0,
-        obstacle,
+        obstacles,
     };
 
     model.generate_bezier_path(100);
@@ -144,33 +178,28 @@ impl Model {
         let target = self.calculate_target_point(point);
         let (_, distance) = self.find_closest_point_on_path(point);
         let path_direction = (target - point).normalize();
-        
-        let obstacle_vector = point - self.obstacle.position;
-        let obstacle_distance = obstacle_vector.length();
-        
-        let obstacle_influence_radius = self.obstacle.radius * 5.0; // Increased influence radius
-        
         let mut direction = path_direction;
-        
-        if obstacle_distance < obstacle_influence_radius {
-            let influence_strength = 1.0 - (obstacle_distance / obstacle_influence_radius).powi(2);
-            let obstacle_influence = influence_strength;
-            
-            let obstacle_direction = obstacle_vector.normalize();
-            
-            let perpendicular = vec2(-path_direction.y, path_direction.x);
-            
-            let side = perpendicular.dot(obstacle_vector).signum();
-            
-            let avoidance_vector = (obstacle_direction + side * perpendicular).normalize();
-            
-            direction = (path_direction + avoidance_vector * obstacle_influence).normalize();
+    
+        for obstacle in &self.obstacles {
+            let obstacle_vector = point - obstacle.position;
+            let obstacle_distance = obstacle_vector.length();
+            let obstacle_influence_radius = obstacle.radius * 5.0; // Increased influence radius
+    
+            if obstacle_distance < obstacle_influence_radius {
+                let influence_strength = 1.0 - (obstacle_distance / obstacle_influence_radius).powi(2);
+                let obstacle_influence = influence_strength;
+                let obstacle_direction = obstacle_vector.normalize();
+                let perpendicular = vec2(-path_direction.y, path_direction.x);
+                let side = perpendicular.dot(obstacle_vector).signum();
+                let avoidance_vector = (obstacle_direction + side * perpendicular).normalize();
+                direction = (path_direction + avoidance_vector * obstacle_influence).normalize();
+            }
         }
-        
+    
         if !direction.x.is_finite() || !direction.y.is_finite() || !distance.is_finite() {
             return (0.0, 0.0);
         }
-        
+    
         (direction.x * distance, direction.y * distance)
     }
 
@@ -252,7 +281,6 @@ fn view(app: &App, model: &Model, frame: Frame) {
 
     let scaling = 100.0;
     
-    // Draw vector field
     let grid_resolution = 20;
     let field_size = 8.0;
     let step = field_size / grid_resolution as f32;
@@ -264,7 +292,14 @@ fn view(app: &App, model: &Model, frame: Frame) {
             
             let point = pt2(x, y);
             
-            if (point - model.obstacle.position).length() <= model.obstacle.radius {
+            let mut within_obstacle_influence = false;
+            for obstacle in &model.obstacles {
+                if (point - obstacle.position).length() <= obstacle.radius {
+                    within_obstacle_influence = true;
+                    break;
+                }
+            }
+            if within_obstacle_influence {
                 continue; 
             }
             
@@ -354,10 +389,12 @@ fn view(app: &App, model: &Model, frame: Frame) {
             .color(rgba(1.0, 0.0, 1.0, 0.5));
     }
 
-    draw.ellipse()
-        .xy(model.obstacle.position * scaling)
-        .radius(model.obstacle.radius * scaling)
-        .color(rgba(1.0, 0.0, 0.0, 0.5));
+    for obstacle in &model.obstacles {
+        draw.ellipse()
+            .xy(obstacle.position * scaling)
+            .radius(obstacle.radius * scaling)
+            .color(rgba(1.0, 0.0, 0.0, 0.5));
+    }
 
     let robot_pos = pt2(model.robot.x, model.robot.y) * scaling;
     draw.ellipse()
