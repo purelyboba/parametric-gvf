@@ -7,7 +7,7 @@ pub fn create_model(app: &App) -> Model {
     let params = SimulationParams {
         v_max: 3.0,
         k_p: 20.0,
-        decel_radius: 1.0,
+        decel_radius: 0.5,
         goal_threshold: 0.1,
         stop_threshold: 0.01,
         min_velocity: 0.1,
@@ -39,13 +39,6 @@ pub fn create_model(app: &App) -> Model {
     let obstacles = vec![
         Obstacle { position: pt2(-3.0, 3.0), radius: 0.2 },
         Obstacle { position: pt2(3.0, -3.0), radius: 0.2 },
-        Obstacle { position: pt2(0.0, 0.0), radius: 0.2 },
-        Obstacle { position: pt2(0.0, 3.0), radius: 0.2 },
-        Obstacle { position: pt2(0.0, -3.0), radius: 0.2 },
-        Obstacle { position: pt2(3.0, 0.0), radius: 0.2 },
-        Obstacle { position: pt2(-3.0, 0.0), radius: 0.2 },
-        Obstacle { position: pt2(-3.0, -3.0), radius: 0.2 },
-        Obstacle { position: pt2(3.0, 3.0), radius: 0.2 },
     ];
 
     let mut model = Model {

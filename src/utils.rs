@@ -24,9 +24,15 @@ impl Model {
         }).collect();
     }
 
-    pub fn distance_to_goal(&self) -> f32 {
+    pub fn vf_distance_to_goal(&self) -> f32 {
         let dx = self.goal.x - self.vector_field_robot.x;
         let dy = self.goal.y - self.vector_field_robot.y;
+        (dx * dx + dy * dy).sqrt()
+    }
+
+    pub fn pp_distance_to_goal(&self) -> f32 {
+        let dx = self.goal.x - self.pure_pursuit_robot.x;
+        let dy = self.goal.y - self.pure_pursuit_robot.y;
         (dx * dx + dy * dy).sqrt()
     }
 
@@ -85,7 +91,7 @@ impl Model {
     }
 
     pub fn calculate_velocity_scaling(&self) -> f32 {
-        let distance = self.distance_to_goal();
+        let distance = self.vf_distance_to_goal();
         
         if distance < self.params.stop_threshold {
             0.0
@@ -103,7 +109,7 @@ impl Model {
             return (0.0, 0.0);
         }
     
-        let distance_to_goal = self.distance_to_goal();
+        let distance_to_goal = self.vf_distance_to_goal();
         let (dx, dy) = if distance_to_goal <= self.params.decel_radius {
             (self.goal.x - self.vector_field_robot.x, self.goal.y - self.vector_field_robot.y)
         } else {
