@@ -4,7 +4,6 @@ use crate::types::Model;
 pub fn update(_app: &App, model: &mut Model, update: Update) {
     let dt = update.since_last.as_secs_f32();
     
-    // Update vector field robot
     if !model.vf_reached_goal {
         let (v, omega) = model.compute_control();
         
@@ -26,7 +25,6 @@ pub fn update(_app: &App, model: &mut Model, update: Update) {
         }
     }
     
-    // Update pure pursuit robot
     if !model.pp_reached_goal {
         let (v, omega) = model.compute_pure_pursuit_control();
         

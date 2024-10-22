@@ -130,7 +130,6 @@ pub fn view(app: &App, model: &Model, frame: Frame) {
                 .color(rgba(1.0, 0.0, 1.0, 0.5));
         }
     
-        // Draw vector field robot
         let vf_robot_pos = pt2(model.vector_field_robot.x, 
                               model.vector_field_robot.y) * scaling;
         draw.ellipse()
@@ -147,7 +146,6 @@ pub fn view(app: &App, model: &Model, frame: Frame) {
             .end(vf_heading_end)
             .color(BLUE);
     
-        // Draw pure pursuit robot
         let pp_robot_pos = pt2(model.pure_pursuit_robot.x, 
                               model.pure_pursuit_robot.y) * scaling;
         draw.ellipse()
@@ -164,7 +162,6 @@ pub fn view(app: &App, model: &Model, frame: Frame) {
             .end(pp_heading_end)
             .color(RED);
     
-        // Draw lookahead point for pure pursuit
         if !model.pp_reached_goal {
             let lookahead = model.find_lookahead_point(
                 pt2(model.pure_pursuit_robot.x, model.pure_pursuit_robot.y)
@@ -175,7 +172,6 @@ pub fn view(app: &App, model: &Model, frame: Frame) {
                 .color(rgba(1.0, 0.0, 0.0, 0.5));
         }
     
-        // Draw status text
         let time_text = format!("Time: {:.2}s", model.simulation_time);
         draw.text(&time_text)
             .xy(pt2(-550.0, 350.0))
@@ -191,7 +187,6 @@ pub fn view(app: &App, model: &Model, frame: Frame) {
             .color(BLACK)
             .font_size(20);
     
-        // Draw legend
         draw.text("Vector Field")
             .xy(pt2(-550.0, 280.0))
             .color(BLUE)

@@ -131,7 +131,6 @@ impl Model {
         let mut closest_idx = 0;
         let mut min_dist = f32::MAX;
         
-        // Find closest point on path
         for (i, path_point) in self.path.iter().enumerate() {
             let dist = (*path_point - robot_pos).length();
             if dist < min_dist {
@@ -140,7 +139,6 @@ impl Model {
             }
         }
         
-        // Look ahead on path
         let lookahead_dist = self.params.pure_pursuit_lookahead;
         let mut accumulated_dist = 0.0;
         let mut target_point = self.path[closest_idx];
@@ -170,7 +168,6 @@ impl Model {
         let dy = target.y - self.pure_pursuit_robot.y;
         let target_distance = (dx * dx + dy * dy).sqrt();
         
-        // Calculate desired heading
         let desired_theta = dy.atan2(dx);
         let theta_error = (desired_theta - self.pure_pursuit_robot.theta).rem_euclid(2.0 * PI);
         let wrapped_error = if theta_error > PI {
@@ -179,7 +176,6 @@ impl Model {
             theta_error
         };
         
-        // Compute velocity scaling based on distance to goal
         let goal_distance = ((self.goal.x - self.pure_pursuit_robot.x).powi(2) + 
                            (self.goal.y - self.pure_pursuit_robot.y).powi(2)).sqrt();
         
